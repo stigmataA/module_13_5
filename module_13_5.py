@@ -1,0 +1,68 @@
+from aiogram import Bot, Dispatcher, executor, types
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from aiogram.dispatcher.filters.state import State, StatesGroup
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+import asyncio
+
+api = "******"
+bot = Bot(token=api)
+dp = Dispatcher(bot, storage=MemoryStorage())
+
+class UserState(StatesGroup):
+    age = State()
+    growth = State()
+    weight = State()
+
+
+kb = ReplyKeyboardMarkup(resize_keyboard=True).add(
+    KeyboardButton(text='Расcчитать'),
+    KeyboardButton(text='Информация'))
+
+
+@dp.message_handler(text=['Расcчитать'])
+async def set_age(message):
+    await message.answer(f"Введите свой возраст")
+    await UserState.age.set()
+
+
+@dp.message_handler(state=UserState.age)
+async def set_growth(message, state):
+    await state.update_data(ag=message.text)
+    await message.answer(f"Введите свой рост")
+    await UserState.growth.set()
+
+
+@dp.message_handler(state=UserState.growth)
+async def set_weight(message, state):
+    await state.update_data(grow=message.text)
+    await message.answer(f"Введите свой вес")
+    await UserState.weight.set()
+
+
+@dp.message_handler(state=UserState.weight)
+async def send_calories(message, state):
+    await state.update_data(weig=message.text)
+    data = await state.get_data()
+    result = (10*int(data['weight']) + 6.25*int(data['growth']) - 5*int(data['age']) + 5)
+    await message.answer(f"Ваша норма калорий (для мужчин) составляет: {result} калорий в сутки")
+    await state.finish()
+
+
+@dp.message_handler(text = ['Привет'])
+async def start(message):
+    await message.answer(f'Привет! Я бот помогающий Вашему здоровью. \n'
+                         f'Чтобы начать, нажмите "Рассчитать"', reply_markup=kb)
+
+
+@dp.message_handler(text = ['Информация'])
+async def info(message):
+    await message.answer(f'Данный бот помогает Вам расcчитать норму потребления калорий для мужчин по'
+                         'упрощенной формуле Миффлина-Сан Жерома')
+
+@dp.message_handler()
+async def all_messages(message):
+    await message.answer('Введите команду /start, чтобы начать общение.')
+
+
+if __name__ == "__main__":
+    executor.start_polling(dp, skip_updates=True)
